@@ -4,7 +4,8 @@ name: Python dependency audit (shared)
 # Python project into a clean virtualenv and run pip-audit over exactly what
 # was installed. pip-audit runs from its own virtualenv, so its own
 # dependencies aren't mixed into the result. Fails on any known vulnerability
-# unless `fail-on-vulnerability` is false.
+# unless `fail-on-vulnerability` is false. Also lists each package's licence
+# (maintenance task Q-03) and can fail on licences you name.
 
 on:
   workflow_call:
@@ -30,6 +31,17 @@ on:
       pip-audit-version:
         type: string
         default: "2.10.1"
+      licence-report:
+        description: "Add a table of installed packages and their licences to the job summary (task Q-03)"
+        type: boolean
+        default: true
+      licence-fail-on:
+        description: "Semicolon-separated licence names that fail the job, matched partially (e.g. 'GPL;AGPL;SSPL'). Empty: report only."
+        type: string
+        default: ""
+      pip-licenses-version:
+        type: string
+        default: "5.5.5"
 
 permissions:
   contents: read
@@ -51,6 +63,7 @@ jobs:
           python-version: ${{ inputs.python-version }}
 
       - name: Install project into a clean virtualenv
+        id: install
         env:
           INSTALL_COMMAND: ${{ inputs.install-command }}
         run: |
@@ -67,14 +80,40 @@ jobs:
           fi
           echo "Installed $(wc -l < "$RUNNER_TEMP/frozen.txt") pinned packages."
 
-      - name: Install pip-audit
+      - name: Install audit tools
+        id: tools
         env:
           PIP_AUDIT_VERSION: ${{ inputs.pip-audit-version }}
+          PIP_LICENSES_VERSION: ${{ inputs.pip-licenses-version }}
         run: |
           python -m venv "$RUNNER_TEMP/audit-venv"
-          "$RUNNER_TEMP/audit-venv/bin/pip" install --quiet "pip-audit==${PIP_AUDIT_VERSION}"
+          "$RUNNER_TEMP/audit-venv/bin/pip" install --quiet \
+            "pip-audit==${PIP_AUDIT_VERSION}" "pip-licenses==${PIP_LICENSES_VERSION}"
 
+      - name: Licence report
+        if: inputs.licence-report || inputs.licence-fail-on != ''
+        env:
+          FAIL_ON: ${{ inputs.licence-fail-on }}
+        run: |
+          tool="$RUNNER_TEMP/audit-venv/bin/pip-licenses"
+          py="$RUNNER_TEMP/project-venv/bin/python"
+          ignore=(--ignore-packages pip setuptools wheel)
+          {
+            echo "## Dependency licences (Q-03)"
+            echo
+            "$tool" --python "$py" "${ignore[@]}" --format markdown --order license
+            echo
+          } >> "$GITHUB_STEP_SUMMARY"
+          if [ -n "$FAIL_ON" ]; then
+            if ! "$tool" --python "$py" "${ignore[@]}" --fail-on "$FAIL_ON" --partial-match > /dev/null; then
+              echo "::error::A dependency uses a licence listed in licence-fail-on ($FAIL_ON). See the job summary."
+              exit 1
+            fi
+          fi
+
+      # Runs even if the licence check failed, so both results are reported.
       - name: pip-audit
+        if: ${{ !cancelled() && steps.tools.outcome == 'success' }}
         env:
           IGNORE_VULNS: ${{ inputs.ignore-vulns }}
           FAIL_ON_VULN: ${{ inputs.fail-on-vulnerability }}

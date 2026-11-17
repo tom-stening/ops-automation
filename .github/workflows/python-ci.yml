@@ -1,0 +1,95 @@
+name: Python CI (shared)
+
+# Reusable workflow: the standard lint, type-check and test job for a Python
+# repo, run across several Python versions. Each step is a command you can
+# change or switch off (pass an empty string), so repos keep one short caller
+# instead of their own copy of this file.
+
+on:
+  workflow_call:
+    inputs:
+      python-versions:
+        description: 'JSON list of Python versions, e.g. ["3.11", "3.12", "3.13"]'
+        type: string
+        default: '["3.11", "3.12", "3.13"]'
+      working-directory:
+        description: "Folder holding the Python project, relative to the repo root"
+        type: string
+        default: "."
+      install-command:
+        type: string
+        default: 'pip install -e ".[dev]"'
+      lint-command:
+        description: "Empty to skip"
+        type: string
+        default: "ruff check ."
+      format-command:
+        description: "Empty to skip, e.g. 'ruff format --check .'"
+        type: string
+        default: ""
+      typecheck-command:
+        description: "Empty to skip, e.g. 'mypy src'"
+        type: string
+        default: ""
+      test-command:
+        description: "Empty to skip"
+        type: string
+        default: "pytest"
+      timeout-minutes:
+        type: number
+        default: 20
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: python ${{ matrix.python-version }}
+    runs-on: ubuntu-latest
+    timeout-minutes: ${{ inputs.timeout-minutes }}
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ${{ fromJSON(inputs.python-versions) }}
+    defaults:
+      run:
+        working-directory: ${{ inputs.working-directory }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install
+        env:
+          CMD: ${{ inputs.install-command }}
+        run: |
+          python -m pip install --upgrade pip
+          bash -euo pipefail -c "$CMD"
+
+      - name: Lint
+        if: inputs.lint-command != ''
+        env:
+          CMD: ${{ inputs.lint-command }}
+        run: bash -euo pipefail -c "$CMD"
+
+      - name: Format check
+        if: inputs.format-command != ''
+        env:
+          CMD: ${{ inputs.format-command }}
+        run: bash -euo pipefail -c "$CMD"
+
+      - name: Type check
+        if: inputs.typecheck-command != ''
+        env:
+          CMD: ${{ inputs.typecheck-command }}
+        run: bash -euo pipefail -c "$CMD"
+
+      - name: Test
+        if: inputs.test-command != ''
+        env:
+          CMD: ${{ inputs.test-command }}
+        run: bash -euo pipefail -c "$CMD"

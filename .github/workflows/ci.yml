@@ -86,3 +86,10 @@ jobs:
       working-directory: tests/fixtures/audit-project
       install-command: pip install -r requirements.txt
       fail-on-vulnerability: false
+      licence-fail-on: AGPL
+
+  self-python-ci:
+    uses: ./.github/workflows/python-ci.yml
+    with:
+      working-directory: tests/fixtures/python-project
+      format-command: ruff format --check .
