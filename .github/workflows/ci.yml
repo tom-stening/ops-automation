@@ -74,6 +74,7 @@ jobs:
     uses: ./.github/workflows/polyglot-assessment.yml
     with:
       hot-path-dir: scripts
+      ops-ref: ${{ github.event.pull_request.head.sha || github.sha }}
       open-issue: false
     permissions:
       contents: read

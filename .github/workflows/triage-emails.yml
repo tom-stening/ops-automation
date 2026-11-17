@@ -9,9 +9,9 @@ on:
   workflow_call:
     inputs:
       ops-ref:
-        description: "Branch, tag or SHA of ops-automation whose scripts to run. Leave empty to use the same commit as this workflow (the ref after @ in your 'uses:' line)."
+        description: "Branch or tag of ops-automation whose scripts to run. Match the ref after @ in your 'uses:' line."
         type: string
-        default: ""
+        default: main
       python-version:
         description: "Python used to run the script (3.11 or newer)"
         type: string
@@ -42,21 +42,9 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: tom-stening/ops-automation
-          # Same commit as this workflow file, so @v1 callers get v1 scripts.
-          ref: ${{ inputs.ops-ref || github.job_workflow_sha || 'main' }}
+          ref: ${{ inputs.ops-ref }}
           path: .ops-automation
           persist-credentials: false
-
-      - name: Show ops-automation version
-        env:
-          REQUESTED: ${{ inputs.ops-ref }}
-          WORKFLOW_SHA: ${{ github.job_workflow_sha }}
-        run: |
-          echo "ops-ref input: ${REQUESTED:-<empty>}; workflow sha: ${WORKFLOW_SHA:-<empty>}"
-          echo "scripts at: $(git -C .ops-automation rev-parse HEAD)"
-          if [ -z "$REQUESTED" ] && [ -z "$WORKFLOW_SHA" ]; then
-            echo "::warning::Could not tell which ops-automation commit this workflow came from; using main's scripts. Set ops-ref to pin them."
-          fi
 
       - uses: actions/setup-python@v5
         with:

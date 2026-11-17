@@ -2,7 +2,7 @@
 # Delete the jobs you don't need. Schedules are in UTC; AEST is UTC+10.
 #
 # To pin a release instead of main, change every "@main" below to the tag
-# (e.g. "@v1"). The scripts follow the same version automatically.
+# (e.g. "@v1") and add "ops-ref: v1" under "with:" so the scripts match.
 name: Ops
 
 on:

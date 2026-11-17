@@ -39,7 +39,7 @@ it is private, allow access under *Settings → Actions → General → Access*.
 
 Every input is optional unless marked required.
 
-**triage-emails.yml**: `ops-ref` (default: same commit as the workflow), `python-version` (`3.12`).
+**triage-emails.yml**: `ops-ref` (default `main`), `python-version` (`3.12`).
 Output `changed` is `'true'` when it committed something. Runs one at a time per
 branch and rebases and retries if the branch moved during the run.
 
@@ -74,9 +74,8 @@ the report only goes to the job summary), `ops-ref`, `python-version`.
 ### Versions
 
 Callers can use `@main` (always latest) or pin a release tag such as `v1`
-for stability by changing the ref after `@` in each `uses:` line. The scripts
-are checked out at the same commit as the workflow, so they match
-automatically; `ops-ref` is only needed to run scripts from a different ref.
+for stability: change the ref after `@` in each `uses:` line **and** set
+`ops-ref: v1`, so the scripts come from the same release as the workflow.
 `v1` moves forward with backward-compatible changes; a breaking change to any
 input gets `v2`.
 
