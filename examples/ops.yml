@@ -1,0 +1,35 @@
+# Copy to .github/workflows/ops.yml in any repo to use the shared ops workflows.
+# Delete the jobs you don't need.
+name: Ops
+
+on:
+  schedule:
+    - cron: "0 * * * *"        # hourly: email triage
+    - cron: "0 21 * * 0"       # weekly (Mon 07:00 AEST): dependency audit
+    - cron: "0 9 1 1,4,7,10 *" # quarterly: polyglot assessment
+  push:
+    paths:
+      - "emails/git_issues/unresolved/**"
+  workflow_dispatch:
+
+jobs:
+  triage-emails:
+    if: github.event_name != 'schedule' || github.event.schedule == '0 * * * *'
+    uses: tom-stening/ops-automation/.github/workflows/triage-emails.yml@main
+    permissions:
+      contents: write
+
+  dependency-audit:
+    if: github.event_name == 'workflow_dispatch' || github.event.schedule == '0 21 * * 0'
+    uses: tom-stening/ops-automation/.github/workflows/dependency-audit.yml@main
+    permissions:
+      contents: read
+
+  polyglot-assessment:
+    if: github.event_name == 'workflow_dispatch' || github.event.schedule == '0 9 1 1,4,7,10 *'
+    uses: tom-stening/ops-automation/.github/workflows/polyglot-assessment.yml@main
+    with:
+      hot-path-dir: ruleset   # your main package folder
+    permissions:
+      contents: read
+      issues: write

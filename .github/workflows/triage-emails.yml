@@ -1,0 +1,50 @@
+name: Triage CI-failure emails (shared)
+
+# Reusable workflow. Moves CI-failure .msg files in the caller's
+# emails/git_issues/ folders through unresolved -> in_progress and records
+# them in the caller's docs/KNOWN_ISSUES.md. See examples/ for a caller.
+
+on:
+  workflow_call:
+    inputs:
+      ops-ref:
+        description: "Branch or tag of ops-automation to run"
+        type: string
+        default: main
+
+jobs:
+  triage:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout calling repo
+        uses: actions/checkout@v4
+
+      - name: Checkout ops-automation scripts
+        uses: actions/checkout@v4
+        with:
+          repository: tom-stening/ops-automation
+          ref: ${{ inputs.ops-ref }}
+          path: .ops-automation
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Run email triage
+        env:
+          OPS_REPO_ROOT: ${{ github.workspace }}
+        run: python .ops-automation/scripts/triage_emails.py
+
+      - name: Commit triage results
+        run: |
+          rm -rf .ops-automation
+          if git diff --quiet && [ -z "$(git status --porcelain emails/)" ]; then
+            echo "Nothing to commit."; exit 0
+          fi
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add docs/KNOWN_ISSUES.md emails/git_issues/
+          git commit -m "chore(triage): process email triage [skip ci]"
+          git push

@@ -1,0 +1,58 @@
+name: Polyglot language assessment (shared)
+
+# Reusable workflow. Profiles the caller's language mix and CPU-heavy
+# functions, then opens (or comments on) a quarterly GitHub issue.
+
+on:
+  workflow_call:
+    inputs:
+      hot-path-dir:
+        description: "Package directory to scan for CPU-heavy functions"
+        type: string
+        default: "."
+      ops-ref:
+        type: string
+        default: main
+
+jobs:
+  assess:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/checkout@v4
+        with:
+          repository: tom-stening/ops-automation
+          ref: ${{ inputs.ops-ref }}
+          path: .ops-automation
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Run assessment
+        env:
+          OPS_REPO_ROOT: ${{ github.workspace }}
+          OPS_HOT_PATH_DIR: ${{ inputs.hot-path-dir }}
+        run: |
+          python .ops-automation/scripts/polyglot_assess.py --out "$RUNNER_TEMP/assessment.md"
+          cat "$RUNNER_TEMP/assessment.md" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Open or update the quarterly issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          M=$(date +%-m); Q="Q$(( (M + 2) / 3 ))"
+          TITLE="Polyglot Assessment: ${Q} $(date +%Y)"
+          EXISTING=$(gh issue list --state open --search "\"${TITLE}\" in:title" --json number --jq '.[0].number // empty')
+          if [ -n "$EXISTING" ]; then
+            gh issue comment "$EXISTING" --body-file "$RUNNER_TEMP/assessment.md"
+          else
+            gh issue create --title "$TITLE" --body-file "$RUNNER_TEMP/assessment.md" --label polyglot-assessment \
+              || gh issue create --title "$TITLE" --body-file "$RUNNER_TEMP/assessment.md"
+          fi

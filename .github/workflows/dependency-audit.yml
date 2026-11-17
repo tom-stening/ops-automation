@@ -1,0 +1,29 @@
+name: Python dependency audit (shared)
+
+# Reusable workflow implementing maintenance task W-01: install the caller's
+# Python project and run pip-audit. Fails on any known vulnerability.
+
+on:
+  workflow_call:
+    inputs:
+      install-command:
+        description: "How to install the caller's dependencies"
+        type: string
+        default: "pip install -e ."
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install project
+        run: ${{ inputs.install-command }}
+      - name: pip-audit
+        run: |
+          pip install pip-audit
+          pip-audit --skip-editable
