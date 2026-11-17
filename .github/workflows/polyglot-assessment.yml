@@ -37,19 +37,19 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           fetch-depth: 1
           persist-credentials: false
 
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           repository: tom-stening/ops-automation
           ref: ${{ inputs.ops-ref }}
           path: .ops-automation
           persist-credentials: false
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: ${{ inputs.python-version }}
 

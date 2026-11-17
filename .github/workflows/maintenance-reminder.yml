@@ -50,21 +50,21 @@ jobs:
     steps:
       - name: Checkout calling repo
         if: inputs.cadence-file != ''
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           persist-credentials: false
           sparse-checkout: ${{ inputs.cadence-file }}
           sparse-checkout-cone-mode: false
 
       - name: Checkout ops-automation scripts
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           repository: tom-stening/ops-automation
           ref: ${{ inputs.ops-ref }}
           path: .ops-automation
           persist-credentials: false
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: ${{ inputs.python-version }}
 
