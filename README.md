@@ -97,3 +97,7 @@ actions up to date.
 
 See [`docs/MAINTENANCE_CADENCE.md`](docs/MAINTENANCE_CADENCE.md) for the weekly,
 monthly and quarterly routine, and [`SECURITY.md`](SECURITY.md) to report a problem.
+
+## Licence
+
+[MIT](LICENSE).
