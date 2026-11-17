@@ -2,12 +2,23 @@
 
 _Document type: Recurring maintenance cadence_
 _Status: Active_
-_Last updated: 2026-05-18_
+_Last updated: 2026-11-17_
 
 ## Purpose
 
 Define the repeating maintenance tasks that keep every repo secure, accurate,
 and operationally reliable.
+
+The shared workflows in this repo automate the routine:
+
+- `dependency-audit.yml` runs W-01 every week.
+- `secret-scan.yml` checks every push and pull request for committed credentials.
+- `maintenance-reminder.yml` opens a checklist issue each month and quarter, built
+  from the **Weekly**, **Monthly** and **Quarterly Tasks** sections below. Keep
+  those headings, and write each task as a `- ` bullet so it becomes a checkbox.
+
+A repo can use its own copy of this file by passing `cadence-file` to
+`maintenance-reminder.yml`.
 
 ---
 
@@ -25,11 +36,14 @@ and operationally reliable.
 
 ### W-01 — Dependency Vulnerability Scan
 
+Automated by `dependency-audit.yml`. To run it by hand in the project's virtualenv:
+
 ```bash
-pip-audit --requirement <(pip freeze)
+pip freeze --exclude-editable > /tmp/frozen.txt
+pip-audit --requirement /tmp/frozen.txt --no-deps --disable-pip
 ```
 
-- CVSS ≥ 7.0: patch within 72 hours.
+- Patch any finding with CVSS ≥ 7.0 within 72 hours.
 - Log lower-severity findings in `docs/KNOWN_ISSUES.md` or `KNOWN_ISSUES.md`.
 
 ---
@@ -47,38 +61,36 @@ pip-audit --requirement <(pip freeze)
 
 ## Quarterly Tasks
 
-### Q1 — Architecture and Compliance Review
+### Q-01 — Architecture and Compliance Review
 
 - Review the main architecture and foundation documentation for accuracy.
 - Confirm open issues are triaged.
 
-### Q2 — AI Output Verification Audit
+### Q-02 — AI Output Verification Audit
 
 Review all agent-assisted or agent-generated code and documentation merged in the
 quarter.
 
-**Checklist:**
-
-- [ ] Run static type checking on the full codebase; confirm zero new errors.
-- [ ] Run the test suite and confirm coverage did not regress; flag AI-generated
+- Run static type checking on the full codebase; confirm zero new errors.
+- Run the test suite and confirm coverage did not regress; flag AI-generated
   modules with insufficient coverage.
-- [ ] Spot-check domain-specific claims in generated code and documentation: verify
+- Spot-check domain-specific claims in generated code and documentation: verify
   at least three constants, formulas, or citations against their authoritative source.
-- [ ] Review generated code in high-risk categories (see `.github/copilot-instructions.md`)
+- Review generated code in high-risk categories (see `.github/copilot-instructions.md`)
   for the specific verification requirements.
-
-**Logging:** Create `docs/archive/AI_AUDIT_<YYYY-MM>.md` with findings. Escalate
-unresolved issues to the backlog.
+- Log findings in `docs/archive/AI_AUDIT_<YYYY-MM>.md` and move unresolved
+  issues to the backlog.
 
 **Reference**: `.github/copilot-instructions.md` for the full AI verification policy.
 
-### Q3 — Dependency and Licence Audit
+### Q-03 — Dependency and Licence Audit
 
 - Full dependency vulnerability scan.
 - Review all dependency licences for compatibility.
 
-### Q4 — Release Hardening Review
+### Q-04 — Release Hardening Review
 
 - Confirm all P1 and P2 issues are resolved or have accepted-risk justification.
 - Update `KNOWN_ISSUES.md` or `docs/KNOWN_ISSUES.md`.
 - Tag the quarterly release candidate and run the full CI suite.
+- Rotate any credential that is due, and confirm the secret scan is green.

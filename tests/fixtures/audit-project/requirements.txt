@@ -1,0 +1,2 @@
+# Used by CI to exercise dependency-audit.yml. Keep it tiny.
+packaging==25.0

@@ -1,58 +1,83 @@
 name: Polyglot language assessment (shared)
 
-# Reusable workflow. Profiles the caller's language mix and CPU-heavy
-# functions, then opens (or comments on) a quarterly GitHub issue.
+# Reusable workflow. Profiles the caller's language mix and CPU-heavy Python
+# functions, then opens the quarterly review issue (or comments on it if it
+# is already open). Tailor the report with .github/polyglot-assessment.json in
+# the calling repo; see scripts/polyglot_assess.py.
 
 on:
   workflow_call:
     inputs:
       hot-path-dir:
-        description: "Package directory to scan for CPU-heavy functions"
+        description: "Package directory to scan for CPU-heavy functions, relative to the repo root"
         type: string
         default: "."
+      config-file:
+        description: "JSON config, relative to the repo root (default: .github/polyglot-assessment.json if present)"
+        type: string
+        default: ""
       ops-ref:
+        description: "Branch or tag of ops-automation whose scripts to run. Match the ref after @ in your 'uses:' line."
         type: string
         default: main
+      python-version:
+        type: string
+        default: "3.12"
+      open-issue:
+        description: "Open or update the quarterly issue. When false, the report only goes to the job summary."
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+  issues: write
 
 jobs:
   assess:
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      issues: write
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 0
+          fetch-depth: 1
+          persist-credentials: false
 
       - uses: actions/checkout@v4
         with:
           repository: tom-stening/ops-automation
           ref: ${{ inputs.ops-ref }}
           path: .ops-automation
+          persist-credentials: false
 
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.12"
+          python-version: ${{ inputs.python-version }}
 
       - name: Run assessment
         env:
           OPS_REPO_ROOT: ${{ github.workspace }}
           OPS_HOT_PATH_DIR: ${{ inputs.hot-path-dir }}
+          OPS_POLYGLOT_CONFIG: ${{ inputs.config-file }}
         run: |
           python .ops-automation/scripts/polyglot_assess.py --out "$RUNNER_TEMP/assessment.md"
           cat "$RUNNER_TEMP/assessment.md" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Open or update the quarterly issue
+        if: inputs.open-issue
         env:
           GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
         run: |
-          M=$(date +%-m); Q="Q$(( (M + 2) / 3 ))"
-          TITLE="Polyglot Assessment: ${Q} $(date +%Y)"
-          EXISTING=$(gh issue list --state open --search "\"${TITLE}\" in:title" --json number --jq '.[0].number // empty')
+          M=$(date -u +%-m); Q="Q$(( (M + 2) / 3 ))"
+          TITLE="Polyglot Assessment: ${Q} $(date -u +%Y)"
+          EXISTING=$(gh issue list --state open --search "\"${TITLE}\" in:title" --json number,title \
+            --jq "map(select(.title == \"${TITLE}\")) | .[0].number // empty")
           if [ -n "$EXISTING" ]; then
             gh issue comment "$EXISTING" --body-file "$RUNNER_TEMP/assessment.md"
-          else
-            gh issue create --title "$TITLE" --body-file "$RUNNER_TEMP/assessment.md" --label polyglot-assessment \
-              || gh issue create --title "$TITLE" --body-file "$RUNNER_TEMP/assessment.md"
+            echo "Commented on #$EXISTING."
+            exit 0
           fi
+          gh label create polyglot-assessment --color 1D76DB \
+            --description "Quarterly language assessment" 2>/dev/null || true
+          gh issue create --title "$TITLE" --body-file "$RUNNER_TEMP/assessment.md" --label polyglot-assessment \
+            || gh issue create --title "$TITLE" --body-file "$RUNNER_TEMP/assessment.md"
