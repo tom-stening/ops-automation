@@ -1,0 +1,21 @@
+{
+  "bottleneck": "Describe what limits this repo's performance, e.g. 'Network latency to upstream APIs dominates; the hot path is async IO, not CPU.'",
+  "recommendation": "Markdown for the overall recommendation section.",
+  "action_items": [
+    "Add a timing probe around the top CPU candidate",
+    "Re-run this assessment next quarter (automated)"
+  ],
+  "candidates": [
+    {
+      "lang": "Rust (via PyO3 extension)",
+      "verdict": "MONITOR",
+      "horizon": "On trigger",
+      "trigger": "A measured function exceeds 200 ms at p95",
+      "fit_areas": ["Tight numeric loops"],
+      "not_fit": ["Async IO"],
+      "adoption_cost": "Medium: maturin build step and Rust toolchain in CI."
+    }
+  ],
+  "exclude_dirs": ["vendor"],
+  "score_threshold": 6
+}

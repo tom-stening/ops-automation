@@ -1,29 +1,107 @@
 name: Python dependency audit (shared)
 
 # Reusable workflow implementing maintenance task W-01: install the caller's
-# Python project and run pip-audit. Fails on any known vulnerability.
+# Python project into a clean virtualenv and run pip-audit over exactly what
+# was installed. pip-audit runs from its own virtualenv, so its own
+# dependencies aren't mixed into the result. Fails on any known vulnerability
+# unless `fail-on-vulnerability` is false.
 
 on:
   workflow_call:
     inputs:
       install-command:
-        description: "How to install the caller's dependencies"
+        description: "How to install the caller's dependencies (runs inside the project virtualenv)"
         type: string
         default: "pip install -e ."
+      working-directory:
+        description: "Folder holding the Python project, relative to the repo root"
+        type: string
+        default: "."
+      python-version:
+        type: string
+        default: "3.12"
+      ignore-vulns:
+        description: "Space-separated vulnerability IDs to ignore (e.g. 'GHSA-xxxx PYSEC-yyyy'); record why in KNOWN_ISSUES"
+        type: string
+        default: ""
+      fail-on-vulnerability:
+        type: boolean
+        default: true
+      pip-audit-version:
+        type: string
+        default: "2.10.1"
+
+permissions:
+  contents: read
 
 jobs:
   audit:
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: ${{ inputs.working-directory }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.12"
-      - name: Install project
-        run: ${{ inputs.install-command }}
-      - name: pip-audit
+          python-version: ${{ inputs.python-version }}
+
+      - name: Install project into a clean virtualenv
+        env:
+          INSTALL_COMMAND: ${{ inputs.install-command }}
         run: |
-          pip install pip-audit
-          pip-audit --skip-editable
+          python -m venv "$RUNNER_TEMP/project-venv"
+          . "$RUNNER_TEMP/project-venv/bin/activate"
+          python -m pip install --upgrade pip
+          bash -euo pipefail -c "$INSTALL_COMMAND"
+          # The project itself (editable or local) has no advisories. Direct
+          # URL/VCS installs can't be looked up by version, so list them.
+          pip freeze --exclude-editable > "$RUNNER_TEMP/all.txt"
+          grep -v ' @ ' "$RUNNER_TEMP/all.txt" > "$RUNNER_TEMP/frozen.txt" || true
+          if grep ' @ ' "$RUNNER_TEMP/all.txt" | grep -v ' @ file://'; then
+            echo "::warning::The packages above are installed from a URL and are not audited."
+          fi
+          echo "Installed $(wc -l < "$RUNNER_TEMP/frozen.txt") pinned packages."
+
+      - name: Install pip-audit
+        env:
+          PIP_AUDIT_VERSION: ${{ inputs.pip-audit-version }}
+        run: |
+          python -m venv "$RUNNER_TEMP/audit-venv"
+          "$RUNNER_TEMP/audit-venv/bin/pip" install --quiet "pip-audit==${PIP_AUDIT_VERSION}"
+
+      - name: pip-audit
+        env:
+          IGNORE_VULNS: ${{ inputs.ignore-vulns }}
+          FAIL_ON_VULN: ${{ inputs.fail-on-vulnerability }}
+        run: |
+          if [ ! -s "$RUNNER_TEMP/frozen.txt" ]; then
+            printf '## Dependency audit (W-01)\n\nNo third-party packages installed.\n' >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          args=(--requirement "$RUNNER_TEMP/frozen.txt" --no-deps --disable-pip --progress-spinner off --desc off)
+          for id in $IGNORE_VULNS; do args+=(--ignore-vuln "$id"); done
+          set +e
+          "$RUNNER_TEMP/audit-venv/bin/pip-audit" "${args[@]}" --format markdown > "$RUNNER_TEMP/audit.md"
+          status=$?
+          set -e
+          {
+            echo "## Dependency audit (W-01)"
+            echo
+            if [ "$status" -eq 0 ]; then
+              echo "No known vulnerabilities in $(wc -l < "$RUNNER_TEMP/frozen.txt") packages."
+            else
+              cat "$RUNNER_TEMP/audit.md"
+              echo
+              echo "CVSS 7.0 or higher: patch within 72 hours. Log lower-severity findings in KNOWN_ISSUES."
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+          cat "$RUNNER_TEMP/audit.md"
+          if [ "$status" -ne 0 ] && [ "$FAIL_ON_VULN" = "true" ]; then
+            echo "::error::pip-audit found known vulnerabilities (see the job summary)."
+            exit "$status"
+          fi

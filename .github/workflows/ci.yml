@@ -1,0 +1,88 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: ruff
+        run: |
+          pip install --quiet "ruff==0.17.5"
+          ruff check .
+          ruff format --check .
+      - name: actionlint (checksum-verified)
+        env:
+          VERSION: "1.7.12"
+          SHA256: "8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8"
+        run: |
+          tarball="actionlint_${VERSION}_linux_amd64.tar.gz"
+          curl -fsSL --retry 3 -o "$RUNNER_TEMP/$tarball" \
+            "https://github.com/rhysd/actionlint/releases/download/v${VERSION}/${tarball}"
+          echo "${SHA256}  $RUNNER_TEMP/$tarball" | sha256sum --check --strict
+          tar -xzf "$RUNNER_TEMP/$tarball" -C "$RUNNER_TEMP" actionlint
+          "$RUNNER_TEMP/actionlint" -color
+
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Unit tests
+        run: python -m unittest discover -s tests -t . -v
+      - name: Smoke-run the scripts against this repo
+        run: |
+          python scripts/polyglot_assess.py --hot-path-dir scripts > /dev/null
+          python scripts/polyglot_assess.py --json | python -m json.tool > /dev/null
+          for c in weekly monthly quarterly; do python scripts/maintenance_issue.py "$c" > /dev/null; done
+          python scripts/triage_emails.py --dry-run
+
+  # Run the shared workflows themselves, the way a calling repo would.
+  self-secret-scan:
+    uses: ./.github/workflows/secret-scan.yml
+    with:
+      full-history: true
+
+  self-polyglot:
+    uses: ./.github/workflows/polyglot-assessment.yml
+    with:
+      hot-path-dir: scripts
+      ops-ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      open-issue: false
+    permissions:
+      contents: read
+      issues: write
+
+  self-dependency-audit:
+    uses: ./.github/workflows/dependency-audit.yml
+    with:
+      working-directory: tests/fixtures/audit-project
+      install-command: pip install -r requirements.txt
+      fail-on-vulnerability: false
