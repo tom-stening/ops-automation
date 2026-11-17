@@ -1,0 +1,20 @@
+# Copy to .github/workflows/ci.yml in a Python repo. Adjust the commands;
+# an empty string skips that step.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  python:
+    uses: tom-stening/ops-automation/.github/workflows/python-ci.yml@main
+    with:
+      install-command: pip install -e ".[dev]"
+      lint-command: ruff check .
+      typecheck-command: mypy src   # or "" to skip
+      test-command: pytest
+    permissions:
+      contents: read

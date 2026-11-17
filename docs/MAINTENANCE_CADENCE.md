@@ -11,7 +11,7 @@ and operationally reliable.
 
 The shared workflows in this repo automate the routine:
 
-- `dependency-audit.yml` runs W-01 every week.
+- `dependency-audit.yml` runs W-01 every week and lists dependency licences for Q-03.
 - `secret-scan.yml` checks every push and pull request for committed credentials.
 - `maintenance-reminder.yml` opens a checklist issue each month and quarter, built
   from the **Weekly**, **Monthly** and **Quarterly Tasks** sections below. Keep

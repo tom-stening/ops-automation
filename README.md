@@ -13,7 +13,8 @@ each calling repo.
 | Workflow | What it does | Suggested cadence | Caller permissions |
 | --- | --- | --- | --- |
 | [`triage-emails.yml`](.github/workflows/triage-emails.yml) | Files CI-failure emails (`emails/git_issues/unresolved/*.msg`) into `docs/KNOWN_ISSUES.md`, moves them to `in_progress/` and commits the result | Hourly and on push | `contents: write` |
-| [`dependency-audit.yml`](.github/workflows/dependency-audit.yml) | Installs the Python project in a clean virtualenv and runs `pip-audit` on what was installed (task W-01) | Weekly | `contents: read` |
+| [`python-ci.yml`](.github/workflows/python-ci.yml) | Standard Python CI: install, lint, format check, type check and tests across several Python versions | Every push and PR | `contents: read` |
+| [`dependency-audit.yml`](.github/workflows/dependency-audit.yml) | Installs the Python project in a clean virtualenv, runs `pip-audit` on what was installed (task W-01) and lists each dependency's licence (Q-03) | Weekly | `contents: read` |
 | [`secret-scan.yml`](.github/workflows/secret-scan.yml) | Scans git history with gitleaks for committed credentials | Every push and PR, full history weekly | `contents: read` |
 | [`maintenance-reminder.yml`](.github/workflows/maintenance-reminder.yml) | Opens the period's checklist issue from [`MAINTENANCE_CADENCE.md`](docs/MAINTENANCE_CADENCE.md) | Monthly and quarterly | `contents: read`, `issues: write` |
 | [`polyglot-assessment.yml`](.github/workflows/polyglot-assessment.yml) | Profiles the language mix and CPU-heavy Python functions and opens the quarterly review issue | Quarterly | `contents: read`, `issues: write` |
@@ -25,7 +26,9 @@ each calling repo.
    doesn't need.
 2. Copy [`examples/secret-scan.yml`](examples/secret-scan.yml) to
    `.github/workflows/secret-scan.yml`.
-3. Optional: add `.github/polyglot-assessment.json` to describe the repo's
+3. For a Python repo, copy [`examples/python-ci.yml`](examples/python-ci.yml) to
+   `.github/workflows/ci.yml` and set its commands.
+4. Optional: add `.github/polyglot-assessment.json` to describe the repo's
    performance profile (see [`examples/polyglot-assessment.json`](examples/polyglot-assessment.json)).
 
 Workflows that run scripts check this repo out into `.ops-automation/`, so it
@@ -40,11 +43,19 @@ Every input is optional unless marked required.
 Output `changed` is `'true'` when it committed something. Runs one at a time per
 branch and rebases and retries if the branch moved during the run.
 
+**python-ci.yml**: `python-versions` (JSON list, default
+`["3.11", "3.12", "3.13"]`), `working-directory` (`.`), `install-command`
+(`pip install -e ".[dev]"`), `lint-command` (`ruff check .`), `format-command`
+(empty), `typecheck-command` (empty), `test-command` (`pytest`),
+`timeout-minutes` (`20`). Pass an empty string to skip a step.
+
 **dependency-audit.yml**: `install-command` (default `pip install -e .`, runs
 inside the project virtualenv), `working-directory` (`.`), `python-version`,
 `ignore-vulns` (space-separated IDs; record the reason in KNOWN_ISSUES),
-`fail-on-vulnerability` (`true`), `pip-audit-version`. Findings go to the job
-summary.
+`fail-on-vulnerability` (`true`), `licence-report` (`true`), `licence-fail-on`
+(semicolon-separated licence names that fail the job, e.g. `GPL;AGPL`; empty
+reports only), `pip-audit-version`, `pip-licenses-version`. Findings and the
+licence table go to the job summary.
 
 **secret-scan.yml**: `full-history` (default `false`: only the commits in the
 push or pull request), `gitleaks-version` and `gitleaks-sha256` (the download is
@@ -62,9 +73,11 @@ the report only goes to the job summary), `ops-ref`, `python-version`.
 
 ### Versions
 
-Callers use `@main` today. Once a tag such as `v1` exists, pin to it for
-stability: change the ref after `@` in each `uses:` line **and** set
+Callers can use `@main` (always latest) or pin a release tag such as `v1`
+for stability: change the ref after `@` in each `uses:` line **and** set
 `ops-ref: v1`, so the scripts come from the same release as the workflow.
+`v1` moves forward with backward-compatible changes; a breaking change to any
+input gets `v2`.
 
 ## Scripts
 
@@ -86,7 +99,7 @@ ruff check . && ruff format --check .        # lint (ruff 0.17)
 ```
 
 CI ([`ci.yml`](.github/workflows/ci.yml)) runs the tests on Python 3.11 to 3.13,
-ruff, actionlint, and calls the shared secret-scan, polyglot and dependency-audit
+ruff, actionlint, and calls the shared python-ci, secret-scan, polyglot and dependency-audit
 workflows on this repo the way a calling repo would. Dependabot keeps the
 actions up to date.
 
