@@ -64,6 +64,26 @@ jobs:
           for c in weekly monthly quarterly; do python scripts/maintenance_issue.py "$c" > /dev/null; done
           python scripts/triage_emails.py --dry-run
 
+  # Warn on a PR that changes a workflow_call interface in a way that would
+  # break callers pinned to the current major tag (needs a vN+1 release).
+  interface-compat:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - name: Compare with the latest release
+        run: |
+          if ! python scripts/release_check.py breaking | tee "$RUNNER_TEMP/compat.txt"; then
+            echo "::warning title=Breaking interface change::Merging this needs a new major release. See the job summary."
+          fi
+          { echo "### Workflow interface vs latest release"; echo; cat "$RUNNER_TEMP/compat.txt"; } >> "$GITHUB_STEP_SUMMARY"
+
   # Run the shared workflows themselves, the way a calling repo would.
   self-secret-scan:
     uses: ./.github/workflows/secret-scan.yml
