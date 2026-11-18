@@ -1,0 +1,65 @@
+name: Release
+
+# Cuts a release of the shared workflows. Run it by hand from main with a
+# version such as 1.0.0. It refuses a version that is not newer than the last
+# release, or a minor/patch release whose workflow_call inputs, outputs or
+# secrets changed in a way that breaks callers (see scripts/release_check.py).
+# On success it creates the immutable tag v1.0.0, moves the major tag v1 to
+# the same commit, and publishes a GitHub release with generated notes.
+# Callers pinned to @v1 with ops-ref: v1 pick the release up on their next run.
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to release, MAJOR.MINOR.PATCH without the v (e.g. 1.0.0)"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0 # all tags, to compare with the last release
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Check the version and caller compatibility
+        env:
+          VERSION: ${{ inputs.version }}
+        run: python scripts/release_check.py check-version "$VERSION"
+
+      - name: Tag and publish
+        env:
+          VERSION: ${{ inputs.version }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tag="v${VERSION}"
+          major="v${VERSION%%.*}"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -a "$tag" -m "$tag"
+          git tag -fa "$major" -m "$major (currently $tag)"
+          git push origin "refs/tags/$tag"
+          git push --force origin "refs/tags/$major"
+          gh release create "$tag" --title "$tag" --generate-notes --verify-tag
+          {
+            echo "### Released $tag"
+            echo
+            echo "\`$major\` now points at \`$tag\` ($(git rev-parse --short HEAD))."
+          } >> "$GITHUB_STEP_SUMMARY"

@@ -79,6 +79,20 @@ for stability: change the ref after `@` in each `uses:` line **and** set
 `v1` moves forward with backward-compatible changes; a breaking change to any
 input gets `v2`.
 
+Releases are cut by running the [`release.yml`](.github/workflows/release.yml)
+workflow from `main` (*Actions → Release → Run workflow*) with a version such
+as `1.0.0`. It creates the tag `v1.0.0`, moves `v1` to the same commit and
+publishes a GitHub release with generated notes. It refuses a version that is
+not newer than the last release, and a `1.x` release whose workflow inputs,
+outputs or secrets changed in a way that breaks callers (an input removed,
+renamed, retyped or newly required). CI flags such changes on pull requests.
+Check by hand with:
+
+```bash
+python scripts/release_check.py breaking          # changes since the latest release
+python scripts/release_check.py check-version 1.1.0
+```
+
 ## Scripts
 
 All scripts use the Python standard library only (3.11 or newer) and can be run
@@ -89,6 +103,7 @@ OPS_REPO_ROOT=../RuleSet python scripts/triage_emails.py --dry-run
 python scripts/triage_emails.py --repo-root ../RuleSet resolve KI-011 --note "Fixed in #42"
 python scripts/polyglot_assess.py --repo-root ../RuleSet --hot-path-dir ruleset
 python scripts/maintenance_issue.py quarterly --format markdown
+python scripts/release_check.py breaking --base v1.0.0
 ```
 
 ## Developing
