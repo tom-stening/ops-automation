@@ -18,3 +18,6 @@ days.
 - Workflows request the least `permissions` they need, and checkouts that don't
   push use `persist-credentials: false`.
 - Dependabot proposes updates to the actions these workflows use.
+- Callers pin release tags such as `v1`. Release tags and `main` should be
+  protected by a repository ruleset (no deletion or force-push), so a tag can only
+  move by a deliberate release.
