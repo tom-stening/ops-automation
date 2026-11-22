@@ -102,12 +102,21 @@ It runs on your own machine rather than in Actions; see
 ```bash
 python -m unittest discover -s tests -t .   # unit tests, no dependencies
 ruff check . && ruff format --check .        # lint (ruff 0.17)
+zizmor --offline .                           # workflow security audit (pip install zizmor)
 ```
 
 CI ([`ci.yml`](.github/workflows/ci.yml)) runs the tests on Python 3.11 to 3.13,
-ruff, actionlint, and calls the shared python-ci, secret-scan, polyglot and dependency-audit
-workflows on this repo the way a calling repo would. Dependabot keeps the
-actions up to date.
+ruff, actionlint, [zizmor](https://docs.zizmor.sh/) and calls the shared python-ci,
+secret-scan, polyglot and dependency-audit workflows on this repo the way a
+calling repo would.
+
+Every repo runs these workflows, so the actions they use are pinned to a full
+commit SHA with the version in a comment (`actions/checkout@<sha> # v5.1.0`).
+A moved or hijacked tag upstream then can't change what runs. Dependabot
+updates the SHA and the comment together, after a 7-day cooldown. zizmor fails
+CI on an unpinned action, template injection, over-broad permissions and
+similar mistakes; deliberate exceptions carry a `# zizmor: ignore[...]` comment
+saying why, and repo-wide settings live in [`.github/zizmor.yml`](.github/zizmor.yml).
 
 ## Related repos
 
