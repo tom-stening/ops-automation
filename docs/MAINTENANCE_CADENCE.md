@@ -57,6 +57,10 @@ pip-audit --requirement /tmp/frozen.txt --no-deps --disable-pip
   freshness and correctness.
 - File issues for any outdated data sources before the next release.
 
+### M-02 — Off-GitHub Backup
+
+- Run `scripts/backup_repos.py` and copy the new set to the second location (see `docs/BACKUP.md`).
+
 ---
 
 ## Quarterly Tasks
@@ -94,3 +98,7 @@ quarter.
 - Update `KNOWN_ISSUES.md` or `docs/KNOWN_ISSUES.md`.
 - Tag the quarterly release candidate and run the full CI suite.
 - Rotate any credential that is due, and confirm the secret scan is green.
+
+### Q-05 — Backup Restore Check
+
+- Run `scripts/backup_repos.py --verify` on the newest set in the second backup location, and restore one repo from its bundle (see `docs/BACKUP.md`).
