@@ -1,0 +1,7 @@
+# zizmor settings for this repo (https://docs.zizmor.sh/configuration/).
+rules:
+  # "$/..." self-repository syntax is newer than actionlint and the runners
+  # some callers use; "./..." is the documented form for calling a reusable
+  # workflow in the same repo.
+  self-repository:
+    disable: true

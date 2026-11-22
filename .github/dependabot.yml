@@ -5,6 +5,10 @@ updates:
     directory: /
     schedule:
       interval: monthly
+    # Wait a week before proposing a new release, so a hijacked or broken
+    # action version is usually caught upstream before it reaches every repo.
+    cooldown:
+      default-days: 7
     groups:
       actions:
         patterns: ["*"]
