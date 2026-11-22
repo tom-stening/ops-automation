@@ -89,7 +89,13 @@ OPS_REPO_ROOT=../RuleSet python scripts/triage_emails.py --dry-run
 python scripts/triage_emails.py --repo-root ../RuleSet resolve KI-011 --note "Fixed in #42"
 python scripts/polyglot_assess.py --repo-root ../RuleSet --hot-path-dir ruleset
 python scripts/maintenance_issue.py quarterly --format markdown
+python scripts/backup_repos.py --dest /path/to/encrypted/backup --owner my-user
 ```
+
+`backup_repos.py` keeps a copy of every repository (all refs, plus issues,
+pull requests and releases as JSON) outside GitHub and proves each copy restores.
+It runs on your own machine rather than in Actions; see
+[`docs/BACKUP.md`](docs/BACKUP.md).
 
 ## Developing
 
