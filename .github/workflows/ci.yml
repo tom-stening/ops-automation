@@ -18,10 +18,10 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
         with:
           persist-credentials: false
-      - uses: actions/setup-python@v6
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
         with:
           python-version: "3.12"
       - name: ruff
@@ -49,10 +49,10 @@ jobs:
       matrix:
         python-version: ["3.11", "3.12", "3.13"]
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
         with:
           persist-credentials: false
-      - uses: actions/setup-python@v6
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
         with:
           python-version: ${{ matrix.python-version }}
       - name: Unit tests
@@ -63,6 +63,26 @@ jobs:
           python scripts/polyglot_assess.py --json | python -m json.tool > /dev/null
           for c in weekly monthly quarterly; do python scripts/maintenance_issue.py "$c" > /dev/null; done
           python scripts/triage_emails.py --dry-run
+
+  # Warn on a PR that changes a workflow_call interface in a way that would
+  # break callers pinned to the current major tag (needs a vN+1 release).
+  interface-compat:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: "3.12"
+      - name: Compare with the latest release
+        run: |
+          if ! python scripts/release_check.py breaking | tee "$RUNNER_TEMP/compat.txt"; then
+            echo "::warning title=Breaking interface change::Merging this needs a new major release. See the job summary."
+          fi
+          { echo "### Workflow interface vs latest release"; echo; cat "$RUNNER_TEMP/compat.txt"; } >> "$GITHUB_STEP_SUMMARY"
 
   # Run the shared workflows themselves, the way a calling repo would.
   self-secret-scan:
